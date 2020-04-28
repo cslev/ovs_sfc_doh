@@ -51,7 +51,7 @@ def add_ovs_flow_rule(src_ip,dst_ip,src_port):
   r="\"table=1,priority=1000,tcp,nw_src=" + str(src_ip) + "," + \
     "nw_dst=" + str(dst_ip) + "," + \
     "tp_src=" + str(src_port) + "," + \
-    "tp_dst=" + str(443) + ",actions=drop\""
+    "tp_dst=" + str(443) + ",actions=drop\n"
     
   logfile.write(r)
   logfile.flush()

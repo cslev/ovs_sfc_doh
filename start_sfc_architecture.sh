@@ -111,17 +111,17 @@ VETH_PRIVATE=veth_private
 sudo ip link del $VETH_PRIVATE > /dev/null 2>&1
 
 # TOPOLOGY
-#+---------+        +------------------+
-#| user    |        | filter           |
-#+---------+        +------------------+
+#+------+           +---------+
+#| user |           | filter  |
+#+------+           +---------+
 #     |                  |            
 #10.10.10.100/24   10.10.10.101/24   
 #     |                  |          
-#+----------------------------------+                             +------------------------------+
-#|                            ______|                             |____                          |
-#| OVSBR-INT                 |veth0 ------------------------------veth1|                OVSBR-PUB---------- INTERNET
-#|                            ------|                             |-----          10.10.10.1/24  |
-#+----------------------------------+                             +------------------------------+
+#+----------------------------------+           +------------------------------+
+#|                            ______|           |____                          |
+#| OVSBR-INT                 |veth0 ------------veth1|                OVSBR-PUB---------- INTERNET
+#|                            ------|           |-----          10.10.10.1/24  |
+#+----------------------------------+           +------------------------------+
 
 
 echo -e "${blue}Starting OVS bridges...${none}"
@@ -184,7 +184,7 @@ retval=$?
 check_retval $retval
 
 echo -en "\tStarting container ${CONTAINER2}...${none}"
-sudo docker run -dit --rm --privileged --name=$CONTAINER2 --net=none cslev/debian_networking bash
+sudo docker run -dit --rm --privileged --name=$CONTAINER2 --net=none cslev/debian_networking:pythonml bash
 retval=$?
 check_retval $retval
 echo -e "Use sudo docker ps to see their details and use sudo docker attach to get into them!\n"
@@ -199,11 +199,6 @@ echo -en "${blue}Connecting port1 of ${CONTAINER2} to OVS (${PRIVATE})...${none}
 sudo ./ovs-docker add-port $PRIVATE eth0 $CONTAINER2 --ipaddress=$CONTAINER2_IP/24 --gateway=$GATEWAY_IP
 retval=$?
 check_retval $retval
-
-#echo -en "${blue}Connecting port2 of ${CONTAINER2} to OVS (${PRIVATE})...${none}"
-#sudo ./ovs-docker add-port $PRIVATE eth1 $CONTAINER2
-#retval=$?
-#check_retval $retval
 
 
 echo -en "${blue}Delete previous flow rules...${none}"
@@ -229,16 +224,16 @@ sudo docker cp ./filter.py $CONTAINER2:/
 retval=$?
 check_retval $retval
 
-echo -en "${blue}Copying ML model (${ML_MODEL}) to the / folder of container ${CONTAINER2}...${none}"
-sudo docker cp ./$ML_MODEL $CONTAINER2:/
-retval=$?
-check_retval $retval
+#echo -en "${blue}Copying ML model (${ML_MODEL}) to the / folder of container ${CONTAINER2}...${none}"
+#sudo docker cp ./$ML_MODEL $CONTAINER2:/
+#retval=$?
+#check_retval $retval
 
-echo -en "${blue}Installing extra packages in ${CONTAINER2}...${none}"
-sudo docker exec filter apt-get update
-sudo docker exec filter apt-get install -y --no-install-recommends python3-numpy python3-sklearn
-retval=$?
-check_retval $retval
+#echo -en "${blue}Installing extra packages in ${CONTAINER2}...${none}"
+#sudo docker exec filter apt-get update
+#sudo docker exec filter apt-get install -y --no-install-recommends python3-numpy python3-sklearn
+#retval=$?
+#check_retval $retval
 
 
 
