@@ -166,7 +166,7 @@ echo -e "${green}${done}[DONE]${none}"
 
 echo -e "${blue}Starting two containers (${CONTAINER1},${CONTAINER2}) in privileged mode...${none}"
 echo -en "\tStarting container ${CONTAINER1}...${none}"
-sudo docker run -dit --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
+sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
 retval=$?
 check_retval $retval
 
@@ -223,6 +223,21 @@ echo -en "${blue}Copying filter.py to the / folder of container ${CONTAINER2}...
 sudo docker cp ./filter.py $CONTAINER2:/
 retval=$?
 check_retval $retval
+
+
+echo -en "${blue}Copying start_firefox.py  and top-1m.csv to the /docker_firefox folder of container ${CONTAINER1}...${none}"
+sudo docker cp ./start_firefox.py $CONTAINER1:/docker_firefox/
+sudo docker cp ./top-1m.csv $CONTAINER1:/docker_firefox/
+retval=$?
+check_retval $retval
+
+
+echo -en "${blue}Installing extra python3-pandas packages in ${CONTAINER1}...${none}"
+sudo docker exec $CONTAINER1 apt-get update
+sudo docker exec $CONTAINER1 apt-get install -y --no-install-recommends python3-pandas
+retval=$?
+check_retval $retval
+
 
 #echo -en "${blue}Copying ML model (${ML_MODEL}) to the / folder of container ${CONTAINER2}...${none}"
 #sudo docker cp ./$ML_MODEL $CONTAINER2:/
