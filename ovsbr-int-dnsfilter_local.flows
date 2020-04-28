@@ -1,0 +1,13 @@
+table=0,priority=1000, arp, actions=FLOOD
+table=0,priority=1000, tcp, tp_dst=443,actions=resubmit(,1)
+table=0,priority=999, ip, actions=resubmit(,2)
+
+table=1,priority=10,tcp,actions=resubmit(,2)
+
+table=2,priority=1000,ip,in_port=2,nw_dst=10.10.10.101,actions=3
+table=2,priority=999,ip,in_port=2,actions=1
+table=2,priority=1000,ip,in_port=3,nw_src=10.10.10.101,nw_dst=10.10.10.100,actions=2
+table=2,priority=999,ip,in_port=3,action=1
+
+table=2,priority=1000,ip,in_port=1,nw_dst=10.10.10.101,actions=3
+table=2,priority=1000,ip,in_port=1,nw_dst=10.10.10.100,actions=2
