@@ -20,11 +20,14 @@ import os
 parser = argparse.ArgumentParser(description="Python-based DNS filter!")
 parser.add_argument('-n', '--num-doublechecks', action="store", default=1, type=int, dest="ndc" , help="Specify the number of double-checks before deciding to block a predicted DoH service's IP!")
 parser.add_argument('-i', '--interface', action="store", default="eth0", type=str, dest="dev" , help="Specify the interface to sniff on!")
+parser.add_argument('-d', '--do-not-block', action="store_true", dest="dnb" , help="Do not block, only log the IPs! (Default: True)")
+parser.set_defaults(dnb=False)
+
 results = parser.parse_args()
 
 num_double_checks=results.ndc
 interface=results.dev
-
+only_log=results.dnb
 
 print("DNS-over-HTTPS needs to be blocked")
 print("Numer of double-checks for proof: {}".format(num_double_checks))
@@ -55,9 +58,10 @@ def add_ovs_flow_rule(src_ip,dst_ip,src_port):
   
   logfile.write(r + str("\n"))
   logfile.flush()
-  cmd=str("sudo ovs-ofctl add-flow ovsbr-int " + r)
-  print(cmd)
-  os.system(cmd)
+  if(not only_log):
+    cmd=str("sudo ovs-ofctl add-flow ovsbr-int " + r)
+    print(cmd)
+    os.system(cmd)
   
     
 
