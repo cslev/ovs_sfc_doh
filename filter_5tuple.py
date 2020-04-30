@@ -17,10 +17,24 @@ import hashlib
 # for running ovs-ofct command
 import os
 
+# for timestamping
+import time
+import datetime
+
+def getDateFormat(timestamp):
+  '''
+  This simple function converts traditional UNIX timestamp to YMD_HMS format
+  timestamp int - unix timestamp to be converted
+  return String - the YMD_HMS format as a string
+  '''
+  return datetime.datetime.\
+          fromtimestamp(float(timestamp)).strftime('%Y%m%d_%H%M%S')
+
+
 parser = argparse.ArgumentParser(description="Python-based DNS filter!")
 parser.add_argument('-n', '--num-doublechecks', action="store", default=1, type=int, dest="ndc" , help="Specify the number of double-checks before deciding to block a predicted DoH service's IP!")
 parser.add_argument('-i', '--interface', action="store", default="eth0", type=str, dest="dev" , help="Specify the interface to sniff on!")
-parser.add_argument('-d', '--do-not-block', action="store_true", dest="dnb" , help="Do not block, only log the IPs! (Default: True)")
+parser.add_argument('-d', '--do-not-block', action="store_true", dest="dnb" , help="Do not block, only log the IPs! (Default: False)")
 parser.set_defaults(dnb=False)
 
 results = parser.parse_args()
@@ -46,9 +60,13 @@ doh_data={
 doh = dict()
 blacklist=list()
 
+#get current timestamp and convert it
+ts = time.time()
+timestamp = getDateFormat(str(ts))
 
-# Open a log file for blacklist five-tuples
-logfile = open("five-tuples-to-block.flows", "w")
+# Open log files for blacklist five-tuples
+logfile = open("five-tuples-to-block.flows_"+str(timestamp), "w")
+logs = open("filter_5tuple.log_"+str(timestamp),"w")
 
 def add_ovs_flow_rule(src_ip,dst_ip,src_port):
   r="\"table=1,priority=1000,tcp,nw_src=" + str(src_ip) + "," + \
@@ -77,69 +95,72 @@ def filter_doh_packets(packet):
   # sendp(packet, iface="eth0")
   # print("DoH Filter not implemented...FORWARDING")
   def make_pred(packet):
-      # custom_action.number+=1
-      # print(f"Packet #{sum(packet_counts.values())}: {packet[0][1].src} ==> {packet[0][1].dst}")
-      #key = tuple(sorted([packet[0][1].src, packet[0][1].dst]))
-      # packet_counts.update([key])
+    # custom_action.number+=1
+    # print(f"Packet #{sum(packet_counts.values())}: {packet[0][1].src} ==> {packet[0][1].dst}")
+    #key = tuple(sorted([packet[0][1].src, packet[0][1].dst]))
+    # packet_counts.update([key])
 
-      ### calculating packet parameters
-      time = packet.time 
-      time_lag_curr = time - filter_doh_packets.prev_time
-      time_lag_prev = filter_doh_packets.prev_lag
-      length = len(packet)
-      prev_length = filter_doh_packets.prev_len
-      packet_difference = filter_doh_packets.number - filter_doh_packets.prev_number
+    ### calculating packet parameters
+    time = packet.time 
+    time_lag_curr = time - filter_doh_packets.prev_time
+    time_lag_prev = filter_doh_packets.prev_lag
+    length = len(packet)
+    prev_length = filter_doh_packets.prev_len
+    packet_difference = filter_doh_packets.number - filter_doh_packets.prev_number
 
-      ### prediction
-      #t0=time
-      X_train =[length , prev_length , time_lag_curr, time_lag_prev, packet_difference]
-      X_train = np.array(X_train)
-      X_train = X_train.reshape(1,-1)
-      prediction = rf3.predict(X_train)
-      #t1 = time
+    ### prediction
+    #t0=time
+    X_train =[length , prev_length , time_lag_curr, time_lag_prev, packet_difference]
+    X_train = np.array(X_train)
+    X_train = X_train.reshape(1,-1)
+    prediction = rf3.predict(X_train)
+    #t1 = time
 
-      #### ----------- DoH -------------
-      if(prediction==1) :
-        ans = 'DoH'
-        # print("packet looks like DoH...DROP")
-        print("DoH service IP? : {}".format(packet[0][1].dst))
-        three_tuple=str(packet[0][1].src) + \
-                    str(packet[0][1].dst) + \
-                    str(packet[0][2].sport)
-        h=h11(three_tuple)
-        #if IP was already identified as DoH service
-        if h in doh:
-          #increase its count
-          doh[h]["count"]+=1
-          doh[h]["dst_ip"]=packet[0][1].dst  
-          doh[h]["src_ip"]=packet[0][1].src
-          doh[h]["src_port"]=packet[0][2].sport
-          #check if the current number is above the threshold
-          if(doh[h]["count"] >= num_double_checks):
-            add_ovs_flow_rule(doh[h]["src_ip"],doh[h]["dst_ip"],doh[h]["src_port"])
-            del doh[h]
-        #otherwise, initialize it
-        else:
-          doh[h]=doh_data
-      #### ----------- HTTP2 -----------
-      else :
-        ans = 'Http2'
-        print("HTTP service IP? : {}".format(packet[0][1].dst))
-        
+    #### ----------- DoH -------------
+    if(prediction==1) :
+      ans = 'DoH'
+      # print("packet looks like DoH...DROP")
+      # print("DoH service IP? : {}".format(packet[0][1].dst))
+      logs.write("DoH service IP? : {}\n".format(packet[0][1].dst))
+      three_tuple=str(packet[0][1].src) + \
+                  str(packet[0][1].dst) + \
+                  str(packet[0][2].sport)
+      h=h11(three_tuple)
+      #if IP was already identified as DoH service
+      if h in doh:
+        #increase its count
+        doh[h]["count"]+=1
+        doh[h]["dst_ip"]=packet[0][1].dst  
+        doh[h]["src_ip"]=packet[0][1].src
+        doh[h]["src_port"]=packet[0][2].sport
+        #check if the current number is above the threshold
+        if(doh[h]["count"] >= num_double_checks):
+          add_ovs_flow_rule(doh[h]["src_ip"],doh[h]["dst_ip"],doh[h]["src_port"])
+          del doh[h]
+      #otherwise, initialize it
+      else:
+        doh[h]=doh_data
+    #### ----------- HTTP2 -----------
+    else :
+      ans = 'Http2'
+      # print("HTTP service IP? : {}".format(packet[0][1].dst))
+      logs.write("HTTP service IP? : {}\n".format(packet[0][1].dst))
+      
+    logs.flush()
 
-      # print("The packet was : "+ ans)
-      # print(X_train)
-      # diff = t1-t0
-      # diff = round(diff,5)
-      #print("Prediction time is "+ str(diff) +"sec" )
+    # print("The packet was : "+ ans)
+    # print(X_train)
+    # diff = t1-t0
+    # diff = round(diff,5)
+    #print("Prediction time is "+ str(diff) +"sec" )
 
 
-      ### updating values for next cycle
-      filter_doh_packets.prev_time = time
-      filter_doh_packets.prev_lag = time_lag_curr
-      filter_doh_packets.prev_number = filter_doh_packets.number 
-      filter_doh_packets.prev_len = length
- 
+    ### updating values for next cycle
+    filter_doh_packets.prev_time = time
+    filter_doh_packets.prev_lag = time_lag_curr
+    filter_doh_packets.prev_number = filter_doh_packets.number 
+    filter_doh_packets.prev_len = length
+    
   # print("Making prediction for packet:")
   # print(packet.summary())
   return make_pred(packet)
@@ -171,7 +192,7 @@ def filter_packets(packet):
 
 #we cannot filter on anything, because then packets missing the filter will not
 #be forwarded by default
-sniff(iface=interface, prn=filter_packets)
+sniff(iface=interface, prn=filter_packets, store=0)
 
 logfile.flush()
 logfile.close()
