@@ -152,8 +152,13 @@ retval=$?
 check_retval $retval
 
 
+echo -en "${blue}Enable IP forwarding..."
+echo 1 |sudo tee /proc/sys/net/ipv4/ip_forward
+retval=$?
+check_retval $retval
+
+
 echo -en "${blue}Creating iptables rules for NAT between ${PUB_INTF} and ${GATEWAY} ${none}"
-sudo echo 1 > /proc/sys/net/ipv4/ip_forward
 sudo iptables -F
 sudo iptables -t nat -F
 sudo iptables -t nat -A POSTROUTING -o $PUB_INTF -j MASQUERADE
@@ -166,7 +171,8 @@ echo -e "${green}${done}[DONE]${none}"
 
 echo -e "${blue}Starting two containers (${CONTAINER1},${CONTAINER2}) in privileged mode...${none}"
 echo -en "\tStarting container ${CONTAINER1}...${none}"
-sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
+#sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
+sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none cslev/docker_firefox:selenium bash
 retval=$?
 check_retval $retval
 
