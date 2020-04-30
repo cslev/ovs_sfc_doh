@@ -11,13 +11,20 @@ import pandas
 parser = argparse.ArgumentParser(description="STart firefox with a DoH resolver's URI set as argument!")
 
 parser.add_argument('-r', '--resolver', action="store", default="", type=str, dest="resolver" , help="Specify DoH resolver URI (Default: None)")
+parser.add_argument('-b', '--bootstrap-address', action="store", default="", type=str, dest="bootstrap" , help="Specify DoH resolver's bootstrap address (Default: None)")
 parser.add_argument('-s', '--start-from', action="store", default=1, type=int, dest="str" , help="Specify the start ID of the websites from Alexa\'s list (Default: 1)")
 parser.add_argument('-e', '--stop-at', action="store", default=5000, type=int, dest="end" , help="Specify the end ID of the websites from Alexa\'s list (Default: 5000)")
+parser.add_argument('-t', '--timeout', action="store", default=16, type=int, dest="timeout",
+                    help="Specify the timeout for a webpage to load (Default: 16)")
+
 args=parser.parse_args()
 
 uri=args.resolver
+bootstrap=args.bootstrap
 start=args.str
 stop=args.end
+timeout=args.timeout
+
 
 def getDateFormat(timestamp):
     '''
@@ -43,6 +50,12 @@ if(uri != ""):
 else:
   logs.write("No DoH resolver will be used\n")
 
+if(bootstrap != ""):
+  logs.write("Bootstrap address: " + bootstrap + "\n")
+else:
+  logs.write("No DoH bootstrap address is specified\n")
+
+
 options = Options()
 options.headless = True
 
@@ -59,16 +72,52 @@ if(uri!=""):
   profile.set_preference("network.trr.mode", 3)
   profile.set_preference("network.trr.uri", uri)
 
+if(bootstrap!=""):
+  profile.set_preference("network.trr.bootstrapAddress", bootstrap)
 
-driver = webdriver.Firefox(options=options, firefox_profile=profile)
-driver.set_page_load_timeout(16)
-# for u in url:
+
+def init_webdriver():
+  global driver
+  try:
+    driver = webdriver.Firefox(options=options, firefox_profile=profile)
+    driver.set_page_load_timeout(timeout)
+  except WebDriverException as ex:
+    print("Driver creation failed: " + str(ex))
+    logs.write("Driver creation failed: " + str(ex) + "\n")
+    print("Retrying...")
+    logs.write("Retrying...\n")
+
+def close_webdriver():
+  global driver
+  print("closing Firefox driver...")
+  logs.write("closing Firefox driver...")
+  try:
+    driver.close()
+  except WebDriverException as ex:
+    print("failed: \n" + str(ex))
+    logs.write("failed: " + str(ex) + "\n")
+
+def quit_webdriver():
+  global driver
+  print("closing Firefox...")
+  try:
+    driver.quit()
+  except WebDriverException as ex:
+    print("failed: \n" + str(ex))
+    logs.write("failed: " + str(ex) + "\n")
+
+
+
+init_webdriver()
+
 for i,u in enumerate(data['website']):
   if(start > i):
     print("Skipping {}:{}".format(i,u))
+    logs.write("Skipping {}:{}\n".format(i,u))
     continue
   elif(i == stop):
-    print("Reached the end at {}:{}".format(i,u))
+    # print("Reached the end at {}:{}".format(i,u))
+    logs.write("Reached the end at {}:{}\n".format(i,u))
     break
   else:
     try:
@@ -81,32 +130,30 @@ for i,u in enumerate(data['website']):
       time.sleep(2)
     except TimeoutException as ex1 :
       # driver.execute_script("alert(\'Timeout exception:"+str(ex1)+"\');")
-      print("Timeout")
+      print("Timeout: "  +str(ex1))
       logs.write("Timeout"+"\n")
       
     except WebDriverException as ex2 :
       # driver.execute_script("alert(\'Webdriver exception:"+str(ex2)+"\');")
       print("webdriver exception: "+str(ex2))
       logs.write("webdriver exception: "+str(ex2)+"\n")
+      print("Reinit driver")
+      logs.write("Reinit driver\n")
+      close_webdriver()
+      init_webdriver()
     except Exception as ex3:
       # driver.execute_script("alert(\'Unknown exception:"+str(ex3)+"\');")
       print("unknown exception: "+str(ex3))
       logs.write("unknown exception: "+str(ex3)+"\n")
+      print("Reinit driver")
+      logs.write("Reinit driver\n")
+      close_webdriver()
+      init_webdriver()
       
     continue
     logs.flush()
     # driver.switch_to.alert.text
   
+
+quit_webdriver()
 logs.close()
-print("closing Firefox driver...")
-try:
-  driver.close()
-except Exception as ex:
-  print("failed: \n" + str(ex))
-
-print("closing Firefox...")
-try:
-  driver.quit()
-except Exception as ex:
-  print("failed: \n" + str(ex))
-
