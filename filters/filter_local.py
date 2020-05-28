@@ -31,13 +31,15 @@ def getDateFormat(timestamp):
           fromtimestamp(float(timestamp)).strftime('%Y%m%d_%H%M%S')
 
 
-parser = argparse.ArgumentParser(description="Python-based DNS filter!")
+parser = argparse.ArgumentParser(description="Python-based DoH filter that adds corresponding 5-tuples of a DoH communication to a blacklist in OVS!")
 parser.add_argument('-n', '--num-doublechecks', action="store", default=1, type=int, dest="ndc" , help="Specify the number of double-checks before deciding to block a predicted DoH service's IP (Default: 1)!")
 parser.add_argument('-i', '--interface', action="store", default="eth0", type=str, dest="dev" , help="Specify the interface to sniff on (Default: eth0)!")
-parser.add_argument('-d', '--do-not-block', action="store_true", dest="dnb" , help="Do not block, only log the IPs! (Default: False)")
+parser.add_argument('-d', '--do-not-block', action="store_true", dest="dnb", help="Do not block, only log the IPs! (Default: False)")
 parser.add_argument('-m', '--ml-model', action="store", dest="model", default="./model2_rf3.pkl", help="Specify the ML model's location! (Default: ./model2_rf3.pkl)")
 parser.add_argument('-b', '--ovs-bridge', action="store", dest="ovs", default="ovsbr-int", help="Specify OVS switch where filtering is done! (Default: ovsbr-int)")
+parser.add_argument('-o', '--only-block-IP', action="store_true", dest="only_ip",help="Block destination IP only instead of 5-tuple (Default: False)")
 parser.set_defaults(dnb=False)
+parser.set_defaults(only_ip=False)
 
 results = parser.parse_args()
 
@@ -46,6 +48,7 @@ INTERFACE=results.dev
 ONLY_LOG=results.dnb
 MODEL=results.model
 OVS=results.ovs
+ONLY_DST_IP=results.only_ip
 
 
 print("DNS-over-HTTPS needs to be blocked")
@@ -62,10 +65,12 @@ doh_data={
   "dst_ip"   : "",
   # dst_port : "", #THIS IS KNOWN AND STATIC FOR DoH packets (443)
   # ip_proto : "", #THIS IS KNOWN AND STATIC FOR DoH packets (6)
-  "count"    : 0
+  "count"    : 0#,
+  # "blocked"  : False
 }
 doh = dict()
 blacklist=list()
+
 
 #get current timestamp and convert it
 ts = time.time()
@@ -75,11 +80,11 @@ timestamp = getDateFormat(str(ts))
 logfile = open("five-tuples-to-block.flows_"+str(timestamp), "w")
 logs = open("filter_5tuple.log_"+str(timestamp),"w")
 
-def add_ovs_flow_rule(src_ip,dst_ip,src_port):
+def block_5_tuple(src_ip,dst_ip,src_port):
   r="\"table=1,priority=1000,tcp,nw_src=" + str(src_ip) + "," + \
     "nw_dst=" + str(dst_ip) + "," + \
     "tp_src=" + str(src_port) + "," + \
-    "tp_dst=" + str(443) + ",actions=drop\""
+    "tp_dst=" + str(443) + ",idle_timeout=100,actions=drop\""
   
   logfile.write(r + str("\n"))
   logfile.flush()
@@ -88,7 +93,14 @@ def add_ovs_flow_rule(src_ip,dst_ip,src_port):
     print(cmd)
     os.system(cmd)
   
-    
+def block_dst_ip(dst_ip):
+  r="\"table=1,priority=1000,tcp,nw_dst=" + str(dst_ip) + ",idle_timeout=100, actions=drop\""
+  logfile.write(r + str("\n"))
+  logfile.flush()
+  if(not ONLY_LOG):
+    cmd=str("sudo ovs-ofctl add-flow " + OVS + " " + r)
+    print(cmd)
+    os.system(cmd)
 
 #simplest and one of the fastest hash function according to a test here
 #https://www.peterbe.com/plog/best-hashing-function-in-python
@@ -142,8 +154,13 @@ def filter_doh_packets(packet):
         doh[h]["src_port"]=packet[0][2].sport
         #check if the current number is above the threshold
         if(doh[h]["count"] >= NUM_DOUBLE_CHECKS):
-          add_ovs_flow_rule(doh[h]["src_ip"],doh[h]["dst_ip"],doh[h]["src_port"])
+          logs.write("Classified as DoH : {}\n".format(packet[0][1].dst))
+          if(ONLY_DST_IP):
+            block_dst_ip(doh[h]["dst_ip"])
+          else:
+            block_5_tuple(doh[h]["src_ip"],doh[h]["dst_ip"],doh[h]["src_port"])
           del doh[h]
+          # doh[h]["blocked"]=True
       #otherwise, initialize it
       else:
         doh[h]=doh_data
@@ -151,16 +168,9 @@ def filter_doh_packets(packet):
     else :
       ans = 'Http2'
       # print("HTTP service IP? : {}".format(packet[0][1].dst))
-      logs.write("HTTP service IP? : {}\n".format(packet[0][1].dst))
+      logs.write("Classified as HTTP2 : {}\n".format(packet[0][1].dst))
       
     logs.flush()
-
-    # print("The packet was : "+ ans)
-    # print(X_train)
-    # diff = t1-t0
-    # diff = round(diff,5)
-    #print("Prediction time is "+ str(diff) +"sec" )
-
 
     ### updating values for next cycle
     filter_doh_packets.prev_time = time
@@ -168,8 +178,7 @@ def filter_doh_packets(packet):
     filter_doh_packets.prev_number = filter_doh_packets.number 
     filter_doh_packets.prev_len = length
     
-  # print("Making prediction for packet:")
-  # print(packet.summary())
+
   return make_pred(packet)
 
 filter_doh_packets.prev_time = 0

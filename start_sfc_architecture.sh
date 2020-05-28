@@ -1,6 +1,8 @@
 #!/bin/bash
 
-ML_MODEL="model2_rf3.pkl"
+#ML_MODEL="model2_rf3.pkl"
+ML_MODEL="modelv3.pkl"
+
 {
 #COLORIZING
 none='\033[0m'
@@ -49,12 +51,14 @@ function show_help
   echo -e "${green}Example: sudo ./start_sfc_architecture.sh -o <INTERNET_FACING_ETH>${none}"
   echo -e "\t\t-o <INTERNET_FACING_ETH>: The device name on your host/ in your VM used for accessing the INTERNET"
   echo -e "\t\t-c: enable container based filtering"
+  echo -e "\t\t-g: start user container with GUI"
   exit
 }
 
 PUB_INTF=""
 CONTAINER_BASED=0
-while getopts "h?o:c" opt
+GUI=0
+while getopts "h?o:cg" opt
 do
   case "$opt" in
   h|\?)
@@ -63,8 +67,11 @@ do
   o)
     PUB_INTF=$OPTARG
     ;;
-  o)
+  c)
     CONTAINER_BASED=1
+    ;;
+  g)
+    GUI=1
     ;;
   *)
     show_help
@@ -124,8 +131,13 @@ sudo ip link del $VETH_PRIVATE > /dev/null 2>&1
 #+----------------------------------+           +------------------------------+
 
 
+echo -e "${blue}Stopping any running OVS bridges...${none}"
+sudo ./ovs_stuffs/stop_ovs.sh 2&>1 > /dev/null
+sudo ./ovs_stuffs/stop_ovs.sh 2&>1 > /dev/null
+echo -e "${green}${done}[DONE]${none}"
+
 echo -e "${blue}Starting OVS bridges...${none}"
-sudo ./start_ovs.sh -n $PRIVATE
+sudo ./ovs_stuffs/start_ovs.sh -n $PRIVATE
 sudo ovs-vsctl add-br $GATEWAY
 echo -e "${green}${done}[DONE]${none}"
 
@@ -171,8 +183,13 @@ echo -e "${green}${done}[DONE]${none}"
 
 echo -e "${blue}Starting two containers (${CONTAINER1},${CONTAINER2}) in privileged mode...${none}"
 echo -en "\tStarting container ${CONTAINER1}...${none}"
-#sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
-sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none cslev/docker_firefox:selenium bash
+
+if [ $GUI -eq 1 ]
+then
+  sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
+else
+  sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none cslev/docker_firefox:selenium bash
+fi
 retval=$?
 check_retval $retval
 
@@ -189,22 +206,25 @@ sudo docker ps -a |grep $CONTAINER1 > /dev/null 2>&1
 retval=$?
 check_retval $retval
 
-echo -en "\tStarting container ${CONTAINER2}...${none}"
-sudo docker run -dit --rm --privileged --name=$CONTAINER2 --net=none cslev/debian_networking:pythonml bash
-retval=$?
-check_retval $retval
-echo -e "Use sudo docker ps to see their details and use sudo docker attach to get into them!\n"
-
 echo -en "${blue}Connecting ${CONTAINER1} to OVS (${PRIVATE})...${none}"
-sudo chmod +x ovs-docker
-sudo ./ovs-docker add-port $PRIVATE eth0 $CONTAINER1 --ipaddress=$CONTAINER1_IP/24 --gateway=$GATEWAY_IP
+sudo chmod +x ./ovs_stuffs/ovs-docker
+sudo ./ovs_stuffs/ovs-docker add-port $PRIVATE eth0 $CONTAINER1 --ipaddress=$CONTAINER1_IP/24 --gateway=$GATEWAY_IP
 retval=$?
 check_retval $retval
 
-echo -en "${blue}Connecting port1 of ${CONTAINER2} to OVS (${PRIVATE})...${none}"
-sudo ./ovs-docker add-port $PRIVATE eth0 $CONTAINER2 --ipaddress=$CONTAINER2_IP/24 --gateway=$GATEWAY_IP
-retval=$?
-check_retval $retval
+if [ $CONTAINER_BASED -eq 1 ]
+then
+  echo -en "\tStarting container ${CONTAINER2}...${none}"
+  sudo docker run -dit --rm --privileged --name=$CONTAINER2 --net=none cslev/debian_networking:pythonml bash
+  retval=$?
+  check_retval $retval
+  echo -e "Use sudo docker ps to see their details and use sudo docker attach to get into them!\n"
+  
+  echo -en "${blue}Connecting port1 of ${CONTAINER2} to OVS (${PRIVATE})...${none}"
+  sudo ./ovs_stuffs/ovs-docker add-port $PRIVATE eth0 $CONTAINER2 --ipaddress=$CONTAINER2_IP/24 --gateway=$GATEWAY_IP
+  retval=$?
+  check_retval $retval
+fi
 
 
 echo -en "${blue}Delete previous flow rules...${none}"
@@ -217,47 +237,43 @@ echo -en "${blue}Add flow rules to ${PRIVATE}...${none}"
 #L3 routing between
 if [ $CONTAINER_BASED -eq 1 ]
 then
-  sudo ovs-ofctl add-flows $PRIVATE ovsbr-int-dnsfilter.flows
+  sudo ovs-ofctl add-flows $PRIVATE ovs_stuffs/ovsbr-int-dnsfilter_container.flows
 else
-  sudo ovs-ofctl add-flows $PRIVATE ovsbr-int-dnsfilter_local.flows
+  sudo ovs-ofctl add-flows $PRIVATE ovs_stuffs/ovsbr-int-dnsfilter_local.flows
 fi
 retval=$?
 check_retval $retval
 
 
-echo -en "${blue}Copying filter.py to the / folder of container ${CONTAINER2}...${none}"
-sudo docker cp ./filter.py $CONTAINER2:/
-retval=$?
-check_retval $retval
 
 
-echo -en "${blue}Copying start_firefox.py  and top-1m.csv to the /docker_firefox folder of container ${CONTAINER1}...${none}"
-sudo docker cp ./start_firefox.py $CONTAINER1:/docker_firefox/
-sudo docker cp ./top-1m.csv $CONTAINER1:/docker_firefox/
+echo -en "${blue}Copying start_firefox.py, top-1m.csv, and r_config.json to the /docker_firefox folder of container ${CONTAINER1}...${none}"
+sudo docker cp ./user_tools/start_firefox.py $CONTAINER1:/docker_firefox/
+sudo docker cp ./resources/top-1m.csv $CONTAINER1:/docker_firefox/
+sudo docker cp ./resources/r_config.json $CONTAINER1:/docker_firefox/
 retval=$?
 check_retval $retval
 
 
 echo -en "${blue}Installing extra python3-pandas packages in ${CONTAINER1}...${none}"
 sudo docker exec $CONTAINER1 apt-get update
-sudo docker exec $CONTAINER1 apt-get install -y --no-install-recommends python3-pandas
+sudo docker exec $CONTAINER1 apt-get install -y --no-install-recommends python3-pandas procps nano
 retval=$?
 check_retval $retval
 
+if [ $CONTAINER_BASED -eq 1 ]
+then
 
-#echo -en "${blue}Copying ML model (${ML_MODEL}) to the / folder of container ${CONTAINER2}...${none}"
-#sudo docker cp ./$ML_MODEL $CONTAINER2:/
-#retval=$?
-#check_retval $retval
+  echo -en "${blue}Copying filter.py to the / folder of container ${CONTAINER2}...${none}"
+  sudo docker cp ./filters/filter.py $CONTAINER2:/
+  retval=$?
+  check_retval $retval
 
-#echo -en "${blue}Installing extra packages in ${CONTAINER2}...${none}"
-#sudo docker exec filter apt-get update
-#sudo docker exec filter apt-get install -y --no-install-recommends python3-numpy python3-sklearn
-#retval=$?
-#check_retval $retval
-
-
-
+  echo -en "${blue}Copying ML model (${ML_MODEL}) to the / folder of container ${CONTAINER2}...${none}"
+  sudo docker cp ./ml_models/$ML_MODEL $CONTAINER2:/
+  retval=$?
+  check_retval $retval
+fi
 
 
 
@@ -270,12 +286,14 @@ do
 	check_retval $retval
 done
 echo -e "${blue}Disabling checksum offloading inside the containers...${none}"
+if [ $CONTAINER_BASED -eq 1 ]
+then
+  echo -en "${blue}In container ${CONTAINER2}...${none}"
+  sudo docker exec $CONTAINER2 ethtool -K eth0 tx off rx off 1> /dev/null
+  retval=$?
+  check_retval $retval
+fi
 
-echo -en "${blue}in container ${CONTAINER2}...${none}"
-sudo docker exec $CONTAINER2 ethtool -K eth0 tx off rx off 1> /dev/null
-retval=$?
-check_retval $retval
-
-echo -en "${blue}in container ${CONTAINER1}..."
+echo -en "${blue}In container ${CONTAINER1}..."
 echo -e "${yellow} NOT IN PRIVILEGED mode due to GUI-X11 requirements, skipping...${none}"
 
