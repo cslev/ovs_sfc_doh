@@ -6,7 +6,7 @@
       "bootstrap": "104.16.248.249"
   },
   "2": {
-      "id":2,
+      "id": 2,
       "name": "google",
       "uri": "https://dns.google/dns-query",
       "bootstrap": "8.8.8.8"
@@ -25,127 +25,121 @@
   },
   "5": {
       "id": 5,
-      "name":"powerdns",
+      "name": "powerdns",
       "uri": "https://doh.powerdns.org",
       "bootstrap": "136.144.215.158"
   },
   "6": {
       "id": 6,
-      "name":"doh.li",
+      "name": "doh.li",
       "uri": "https://doh.li/dns-query",
       "bootstrap": "46.101.66.244"
   },
   "7": {
       "id": 7,
-      "name":"jcdns",
-      "uri": "https://jcdns.fun/dns-query",
-      "bootstrap": "178.62.214.105"
-  },
-  "8": {
-      "id": 8,
-      "name":"adguard",
+      "name": "adguard",
       "uri": "https://dns.adguard.com/dns-query",
       "bootstrap": "176.103.130.130"
   },
-  "9": {
-      "id": 9,
-      "name":"opendns",
+  "8": {
+      "id": 8,
+      "name": "opendns",
       "uri": "https://doh.opendns.com/dns-query",
       "bootstrap": "146.112.41.2"
   },
-  "10": {
-      "id": 10,
-      "name":"comcast",
+  "9": {
+      "id": 9,
+      "name": "comcast",
       "uri": "https://doh.xfinity.com/dns-query",
       "bootstrap": "96.113.151.150"
   },
-  "11": {
+  "10": {
       "id": 11,
-      "name":"cz.nic",
+      "name": "cz.nic",
       "uri": "https://odvr.nic.cz/doh",
       "bootstrap": "185.43.135.1"
   },
-  "12": {
-      "id": 12,
-      "name":"dnslify",
+  "11": {
+      "id": 11,
+      "name": "dnslify",
       "uri": "https://doh.dnslify.com/dns-query",
       "bootstrap": "185.235.81.1"
   },
-  "13": {
+  "12": {
       "id": 13,
-      "name":"blahdns.com",
+      "name": "blahdns.com",
       "uri": "https://doh-jp.blahdns.com/dns-query",
       "bootstrap": "45.32.55.94"
   },
-  "14": {
+  "13": {
       "id": 14,
-      "name":"ffmuc.net",
+      "name": "ffmuc.net",
       "uri": "https://doh.ffmuc.net/dns-query",
       "bootstrap": "195.30.94.28"
   },
-  "15": {
-      "id": 15,
-      "name":"containerpi",
+  "14": {
+      "id": 14,
+      "name": "containerpi",
       "uri": "https://dns.containerpi.com/dns-query",
       "bootstrap": "45.77.180.10"
   },
-  "16": {
-      "id": 16,
-      "name":"tiarap",
+  "15": {
+      "id": 15,
+      "name": "tiarap",
       "uri": "https://doh.tiar.app/dns-query",
       "bootstrap": "174.138.29.175"
   },
-  "17": {
-      "id": 17,
-      "name":"dns.sb",
+  "16": {
+      "id": 16,
+      "name": "dns.sb",
       "uri": "https://doh.dns.sb/dns-query",
       "bootstrap": "104.27.158.178"
   },
-  "18": {
-      "id": 18,
-      "name":"association_42l",
+  "17": {
+      "id": 17,
+      "name": "association_42l",
       "uri": "https://doh.42l.fr/dns-query",
       "bootstrap": "185.216.27.142"
   },
-  "19": {
-      "id": 19,
-      "name":"andrews_and_arnold",
+  "18": {
+      "id": 18,
+      "name": "andrews_and_arnold",
       "uri": "https://dns.aa.net.uk/dns-query",
       "bootstrap": "217.169.20.23"
   },
-  "20": {
-      "id": 20,
-      "name":"twnic",
+  "19": {
+      "id": 19,
+      "name": "twnic",
       "uri": "https://dns.twnic.tw/dns-query",
       "bootstrap": "210.17.9.228"
   },
-  "21": {
-      "id": 21,
-      "name":"digital_gesellschaft",
+  "20": {
+      "id": 20,
+      "name": "digital_gesellschaft",
       "uri": "https://dns.digitale-gesellschaft.ch/dns-query",
       "bootstrap": "185.95.218.42"
   },
-  "22": {
-      "id": 22,
-      "name":"libredns",
+  "21": {
+      "id": 21,
+      "name": "libredns",
       "uri": "https://doh.libredns.gr/dns-query",
       "bootstrap": "116.202.176.26"
   },
-  "23": {
-      "id": 23,
-      "name":"pi-dns",
+  "22": {
+      "id": 22,
+      "name": "pi-dns",
       "uri": "https://doh.centraleu.pi-dns.com/dns-query",
       "bootstrap": "88.198.91.187"
   },
-  "24": {
-      "id": 24,
-      "name":"dns.flatuslifir.is",
+  "23": {
+      "id": 23,
+      "name": "dns.flatuslifir.is",
       "uri": "https://dns.flatuslifir.is/dns-query",
       "bootstrap": "46.239.223.80"
   },
-  "25": {
-      "id": 25,
-      "name":"he.net",
+  "24": {
+      "id": 24,
+      "name": "he.net",
       "uri": "https://ordns.he.net/dns-query",
       "bootstrap": "74.82.42.42"
   }
