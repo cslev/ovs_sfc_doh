@@ -21,14 +21,18 @@ parser = argparse.ArgumentParser(description="Start firefox with a DoH resolver'
 parser.add_argument('-r', '--resolver', action="store", default="", type=str, dest="resolver" , help="Specify DoH resolver URI (Default: None)")
 parser.add_argument('-j', '--resolver_json', action="store_true", dest="resolver_json", help="Indicate to iterate through all reasolvers instead (defined in r_config.json) if setting one at a time. If indicated other arguments about resolvers and bootstrap address will be ignored (Default: False).")
 parser.set_defaults(resolver_json=False)
+parser.add_argument('-n', '--skip-first-n-resolver', action="store", type=int, default=-1, dest="skip_first_n_resolver", help="If -j argument is used, define here how many resolvers should be skipped from the beginning of r_config.json. (Default: 0)")
+parser.add_argument('-m', '--skip-last-n-resolver', action="store", type=int, default=-1, dest="skip_last_m_resolver", help="If -j argument is used, define here how many resolvers should be skipped from the end of r_config.json. (Default: 0)")
 parser.add_argument('-b', '--bootstrap-address', action="store", default="", type=str, dest="bootstrap" , help="Specify DoH resolver's bootstrap address (Default: None)")
 parser.add_argument('-s', '--start-from', action="store", default=1, type=int, dest="str" , help="Specify the start ID of the websites from Alexa\'s list (Default: 1)")
 parser.add_argument('-e', '--stop-at', action="store", default=5000, type=int, dest="end" , help="Specify the end ID of the websites from Alexa\'s list (Default: 5000)")
+parser.add_argument('-w', '--website-to-visit', action="store", default=None, type=str, dest="website" , help="Specify a website to visit INSTEAD of the top 10 sites (Default: No website)")
 parser.add_argument('-t', '--timeout', action="store", default=16, type=int, dest="timeout",
                     help="Specify the timeout for a webpage to load (Default: 16)")
 parser.add_argument('-f', '--flush-dns-cache', action="store_true", dest="flush_dns",
                     help="Specify if Firefox should flush DNS cache before every website. It increases processing time as Firefox is restarted every time then (Default: False)")               
 parser.set_defaults(flush_dns=False)
+
 parser.add_argument('-v', '--verbose', action="store_true", dest="v", help="Verbose mode (Default: False)")             
 parser.set_defaults(v=False)
 args=parser.parse_args()
@@ -41,6 +45,9 @@ STOP=args.end
 TIMEOUT=args.timeout
 FLUSH_DNS=args.flush_dns
 VERBOSE=args.v
+SKIP_N_FIRST=int(args.skip_first_n_resolver)
+SKIP_M_LAST=int(args.skip_last_m_resolver)
+WEBSITE=args.website
 
 def getDateFormat(timestamp):
     '''
@@ -82,6 +89,9 @@ elif not RESOLVER_JSON:
 else:
   logs.write("Testing all possible resolvers\n")
   print("Testing all possible resolvers")
+  if(SKIP_N_FIRST != -1):
+    logs.write("...with {} skipped from the beginning\n".format(SKIP_N_FIRST))
+    print("...with {} skipped from the beginning".format(SKIP_N_FIRST))
   
 if(BOOTSTRAP != ""):
   logs.write("Bootstrap address: " + BOOTSTRAP + "\n")
@@ -92,7 +102,19 @@ elif not RESOLVER_JSON:
 else:
   logs.write("Testing all possible bootstrap addresses\n")
   print("Testing all possible bootsrap addresses")
+  if(SKIP_N_FIRST != -1):
+    logs.write("...with {} skipped from the beginning\n".format(SKIP_N_FIRST))
+    print("...with {} skipped from the beginning".format(SKIP_N_FIRST))
+  if(SKIP_M_LAST != -1):
+    logs.write("...with {} skipped from the end\n".format(SKIP_M_LAST))
+    print("...with {} skipped from the end".format(SKIP_M_LAST))
 
+if WEBSITE is None:
+  logs.write("Iterating through all 10 websites from Alexa's list!\n")
+  print("Iterating through all 10 websites from Alexa's list!")
+else:
+  logs.write("Check only the following website: {}\n".format(WEBSITE))
+  print("Check only the following website: {}".format(WEBSITE))
 
 options = Options()
 options.headless = True
@@ -108,7 +130,16 @@ else:
   resolver_config["1"]['uri']=URI
   resolver_config["1"]['bootstrap']=BOOTSTRAP
 
-data=pandas.read_csv('top-1m.csv', names=['rank','website'])
+NUM_RESOLVERS=len(resolver_config)
+
+if(WEBSITE is None):
+  data=pandas.read_csv('top-1m.csv', names=['rank','website'])
+else:
+  data=dict()
+  tmp=list()
+  tmp.append(WEBSITE)
+  data['website']=tmp
+
 
 
 ## specifying the binary path
@@ -179,7 +210,24 @@ def quit_webdriver():
 
 
 
+resolver_count=0
 for j in resolver_config:
+  resolver_count+=1 #increase resolver count var used for skipping some resolvers in the beginning (indicated via SKIP_N_FIRST)
+  
+  if(RESOLVER_JSON and SKIP_N_FIRST != -1):
+    #resolver file is used and SKIP_N_FIRST is defined
+    if(resolver_count <= SKIP_N_FIRST):
+      if(VERBOSE):
+        print("Skipping resolver #{}".format(resolver_count))
+        logs.write("Skipping resolver #{}\n".format(resolver_count))
+      continue #skip resolver  
+  if(RESOLVER_JSON and SKIP_M_LAST != -1):
+    if(resolver_count >= (NUM_RESOLVERS-SKIP_M_LAST)):
+      if(VERBOSE):
+        print("Stopping at resolver #{}".format(resolver_count))
+        logs.write("Stopping at resolver #{}\n".format(resolver_count))
+      break #stop here
+  
   #get resolver data
   name=str(resolver_config[j]['name'])
   uri=str(resolver_config[j]['uri'])
@@ -253,5 +301,5 @@ for j in resolver_config:
       # driver.switch_to.alert.text
     
 
-quit_webdriver()
+  quit_webdriver()
 logs.close()
