@@ -4,13 +4,15 @@
 from scapy.all import sniff , send , sendp, IP
 from scapy.layers.dns import DNS, DNSRR, DNSQR
 from scapy.layers.tls.all import TLS
+from scapy.layers.tls.handshake import TLSClientHello,TLS13ClientHello,TLSServerHello,TLS13ServerHello
 import argparse
 
 #for ML model
 from collections import Counter
 import joblib
-import numpy as np 
+import numpy as np
 
+import ja3 as ja3
 
 parser = argparse.ArgumentParser(description="Python-based DNS filter!")
 
@@ -61,6 +63,9 @@ def filter_dns_packets(packet):
 
 ## ============  DNS-over-HTTPS filtering ===========
 def filter_doh_packets(packet):
+
+
+
   # sendp(packet, iface="eth0")
   # print("DoH Filter not implemented...FORWARDING")
   def make_pred(packet):
@@ -70,7 +75,7 @@ def filter_doh_packets(packet):
       # packet_counts.update([key])
 
       ### calculating packet parameters
-      time = packet.time 
+      time = packet.time
       time_lag_curr = time - filter_doh_packets.prev_time
       time_lag_prev = filter_doh_packets.prev_lag
       length = len(packet)
@@ -104,18 +109,18 @@ def filter_doh_packets(packet):
       ### updating values for next cycle
       filter_doh_packets.prev_time = time
       filter_doh_packets.prev_lag = time_lag_curr
-      filter_doh_packets.prev_number = filter_doh_packets.number 
+      filter_doh_packets.prev_number = filter_doh_packets.number
       filter_doh_packets.prev_len = length
- 
+
   # print("Making prediction for packet:")
   # print(packet.summary())
   return make_pred(packet)
 
 filter_doh_packets.prev_time = 0
-filter_doh_packets.prev_len = 0 
+filter_doh_packets.prev_len = 0
 filter_doh_packets.prev_lag = 0
 filter_doh_packets.number = 0
-filter_doh_packets.prev_number= 0   
+filter_doh_packets.prev_number= 0
 ## ----- DNS-over-HTTPS filtering END ----------------
 
 
@@ -125,7 +130,7 @@ def filter_packets(packet):
   #Scapy cannot distinguish between incoming and outgoing packets, so
   #to avoid infinite loop, let's change outgoing packet's MAC
   new_mac="00:11:22:33:44:55"
-  
+
   if IP in packet:
     #packets coming from the user
     if(packet[0][1].dst != "10.10.10.101" and packet[0][0].src != new_mac):
