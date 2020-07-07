@@ -17,7 +17,7 @@ import socket, struct
 
 # parser for the command line arguements
 parser = argparse.ArgumentParser(description="Start firefox with a DoH resolver's URI set as argument!")
-
+parser.add_argument('-p', '--path_to_resources', action="store", default="../resources", type=str, dest="path_to_resources" , help="Specify the PATH to resources (Default: ../resources)")
 parser.add_argument('-r', '--resolver', action="store", default="", type=str, dest="resolver" , help="Specify DoH resolver URI (Default: None)")
 parser.add_argument('-j', '--resolver_json', action="store_true", dest="resolver_json", help="Indicate to iterate through all reasolvers instead (defined in r_config.json) if setting one at a time. If indicated other arguments about resolvers and bootstrap address will be ignored (Default: False).")
 parser.set_defaults(resolver_json=False)
@@ -37,6 +37,7 @@ parser.add_argument('-v', '--verbose', action="store_true", dest="v", help="Verb
 parser.set_defaults(v=False)
 args=parser.parse_args()
 
+PATH_TO_RESOURCES=args.path_to_resources
 RESOLVER_JSON=args.resolver_json
 URI=args.resolver
 BOOTSTRAP=args.bootstrap
@@ -121,7 +122,7 @@ options.headless = True
 
 
 if(RESOLVER_JSON):
-  with open('r_config.json') as f:
+  with open(PATH_TO_RESOURCES+'/r_config.json') as f:
     resolver_config = json.load(f)
 else:
   resolver_config=dict()
@@ -133,7 +134,7 @@ else:
 NUM_RESOLVERS=len(resolver_config)
 
 if(WEBSITE is None):
-  data=pandas.read_csv('top-1m.csv', names=['rank','website'])
+  data=pandas.read_csv(PATH_TO_RESOURCES+'/top-1m.csv', names=['rank','website'])
 else:
   data=dict()
   tmp=list()
