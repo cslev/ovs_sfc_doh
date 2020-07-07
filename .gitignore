@@ -2,3 +2,4 @@
 *.log*
 five-tuples-to-block.flows*
 *local-blocklist.flows*
+log_*
