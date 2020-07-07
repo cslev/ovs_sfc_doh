@@ -186,9 +186,9 @@ echo -en "\tStarting container ${CONTAINER1}...${none}"
 
 if [ $GUI -eq 1 ]
 then
-  sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
+  sudo docker run -dit --shm-size 4g -v $PWD/user_tools:/docker_firefox/user_tools:rw -v $PWD/resources:/docker_firefox/resources --name=$CONTAINER1 --net=none -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/.Xauthority:/root/.Xauthority --hostname $(hostname) cslev/docker_firefox:selenium "xterm -fn 10x20"
 else
-  sudo docker run -dit --shm-size 4g --name=$CONTAINER1 --net=none cslev/docker_firefox:selenium bash
+  sudo docker run -dit --shm-size 4g -v $PWD/user_tools:/docker_firefox/user_tools:rw -v $PWD/resources:/docker_firefox/resources --name=$CONTAINER1 --net=none cslev/docker_firefox:selenium bash
 fi
 retval=$?
 check_retval $retval
@@ -199,7 +199,7 @@ do
   echo -en "."
   sleep 1s
 done
-echo -en "${none}"
+echo -e "${none}"
 
 echo -en "${blue}Testing whether ${CONTAINER1} is up and running"
 sudo docker ps -a |grep $CONTAINER1 > /dev/null 2>&1
@@ -215,7 +215,7 @@ check_retval $retval
 if [ $CONTAINER_BASED -eq 1 ]
 then
   echo -en "\tStarting container ${CONTAINER2}...${none}"
-  sudo docker run -dit --rm --privileged --name=$CONTAINER2 --net=none cslev/debian_networking:pythonml bash
+  sudo docker run -dit --rm --privileged -v $PWD/filters:/filters:rw -v $PWD/ml_models:/ml_models --name=$CONTAINER2 --net=none cslev/debian_networking:pythonml bash
   retval=$?
   check_retval $retval
   echo -e "Use sudo docker ps to see their details and use sudo docker attach to get into them!\n"
@@ -247,33 +247,33 @@ check_retval $retval
 
 
 
-echo -en "${blue}Copying start_firefox.py, top-1m.csv, and r_config.json to the /docker_firefox folder of container ${CONTAINER1}...${none}"
-sudo docker cp ./user_tools/start_firefox.py $CONTAINER1:/docker_firefox/
-sudo docker cp ./resources/top-1m.csv $CONTAINER1:/docker_firefox/
-sudo docker cp ./resources/r_config.json $CONTAINER1:/docker_firefox/
-retval=$?
-check_retval $retval
+#echo -en "${blue}Copying start_firefox.py, top-1m.csv, and r_config.json to the /docker_firefox folder of container ${CONTAINER1}...${none}"
+#sudo docker cp ./user_tools/start_firefox.py $CONTAINER1:/docker_firefox/
+#sudo docker cp ./resources/top-1m.csv $CONTAINER1:/docker_firefox/
+#sudo docker cp ./resources/r_config.json $CONTAINER1:/docker_firefox/
+#retval=$?
+#check_retval $retval
 
 
-echo -en "${blue}Installing extra python3-pandas packages in ${CONTAINER1}...${none}"
-sudo docker exec $CONTAINER1 apt-get update
-sudo docker exec $CONTAINER1 apt-get install -y --no-install-recommends python3-pandas procps nano
-retval=$?
-check_retval $retval
+#echo -en "${blue}Installing extra python3-pandas packages in ${CONTAINER1}...${none}"
+#sudo docker exec $CONTAINER1 apt-get update
+#sudo docker exec $CONTAINER1 apt-get install -y --no-install-recommends python3-pandas procps nano
+#retval=$?
+#check_retval $retval
 
-if [ $CONTAINER_BASED -eq 1 ]
-then
+#if [ $CONTAINER_BASED -eq 1 ]
+#then
 
-  echo -en "${blue}Copying filter.py to the / folder of container ${CONTAINER2}...${none}"
-  sudo docker cp ./filters/filter.py $CONTAINER2:/
-  retval=$?
-  check_retval $retval
+  #echo -en "${blue}Copying filter.py to the / folder of container ${CONTAINER2}...${none}"
+  #sudo docker cp ./filters/filter_packets_in_container.py $CONTAINER2:/
+  #retval=$?
+  #check_retval $retval
 
-  echo -en "${blue}Copying ML model (${ML_MODEL}) to the / folder of container ${CONTAINER2}...${none}"
-  sudo docker cp ./ml_models/$ML_MODEL $CONTAINER2:/
-  retval=$?
-  check_retval $retval
-fi
+  #echo -en "${blue}Copying ML model (${ML_MODEL}) to the / folder of container ${CONTAINER2}...${none}"
+  #sudo docker cp ./ml_models/$ML_MODEL $CONTAINER2:/
+  #retval=$?
+  #check_retval $retval
+#fi
 
 
 
@@ -288,12 +288,22 @@ done
 echo -e "${blue}Disabling checksum offloading inside the containers...${none}"
 if [ $CONTAINER_BASED -eq 1 ]
 then
-  echo -en "${blue}In container ${CONTAINER2}...${none}"
+  echo -en "\t${CONTAINER2} "
   sudo docker exec $CONTAINER2 ethtool -K eth0 tx off rx off 1> /dev/null
   retval=$?
   check_retval $retval
 fi
 
-echo -en "${blue}In container ${CONTAINER1}..."
+echo -en "\t${CONTAINER1} "
 echo -e "${yellow} NOT IN PRIVILEGED mode due to GUI-X11 requirements, skipping...${none}"
 
+
+echo -en "${blue}Initializing bash_history in containers...${none}"
+sudo docker exec -it $CONTAINER1 bash -c "echo 'cd user_tools' >> /root/.bash_history"
+sudo docker exec -it $CONTAINER1 bash -c "echo './start_firefox.py -r https://mozilla.cloudflare-dns.com/dns-query -b 104.16.248.249 -w google.com' >> /root/.bash_history"
+sudo docker exec -it $CONTAINER1 bash -c "echo './start_firefox.py -j -w google.com' >> /root/.bash_history"
+
+sudo docker exec -it $CONTAINER2 bash -c "echo 'cd filters' >> /root/.bash_history"
+sudo docker exec -it $CONTAINER2 bash -c "echo 'python3 filter_packets_in_container.py -g' >> /root/.bash_history"
+retval=$?
+check_retval $retval
